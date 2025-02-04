@@ -1,0 +1,64 @@
+/* app/globals.css */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Poppins', sans-serif;
+  background: radial-gradient(circle, rgba(255,75,95,1) 0%, rgba(255,133,157,1) 50%, rgba(255,191,201,1) 100%);
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Glassmorphism card effect */
+.glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 1s ease-in-out;
+}
+
+/* Button Hover Glow Effect */
+.glow-button {
+  transition: all 0.3s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.glow-button:hover {
+  box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.8);
+  transform: scale(1.05);
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Floating heart animations */
+.floating-heart {
+  position: absolute;
+  font-size: 24px;
+  animation: float 3s infinite ease-in-out alternate;
+  color: #ff4b5c;
+  opacity: 0.8;
+}
