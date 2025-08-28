@@ -225,44 +225,104 @@ export default function Home() {
       return;
     }
 
-    const res = await fetch('/api/get-answered-questions');
-    const data = await res.json();
-    const alreadyAnswered = data.answeredQuestions.map(q => q.question);
+    try {
+      console.log('🔄 Fetching answered questions for category:', category);
+      
+      const res = await fetch('/api/get-answered-questions');
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('📊 API Response:', data);
+      
+      // FIXED: Your API already returns question strings, not objects
+      const alreadyAnswered = data.answeredQuestions || [];
+      
+      console.log('📋 Already answered questions:', alreadyAnswered.length);
 
-    let availableQuestions = questions[category].filter(q => !alreadyAnswered.includes(q));
+      let availableQuestions = questions[category].filter(q => !alreadyAnswered.includes(q));
 
-    if (availableQuestions.length === 0) {
-      setQuestion("You have answered all questions in this category! 🎉");
-      return;
+      console.log(`📊 Category: ${category}`);
+      console.log(`📊 Total questions in category: ${questions[category].length}`);
+      console.log(`📊 Available (unanswered): ${availableQuestions.length}`);
+
+      if (availableQuestions.length === 0) {
+        setQuestion("🎉 You have answered all questions in this category! Choose another category to continue! 🎉");
+        return;
+      }
+
+      const randomQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+      console.log('✅ Selected question:', randomQuestion.substring(0, 50) + '...');
+      setQuestion(randomQuestion);
+      
+    } catch (error) {
+      console.error('❌ Error fetching answered questions:', error);
+      
+      // Fallback: just pick a random question (might repeat)
+      const fallbackQuestion = questions[category][Math.floor(Math.random() * questions[category].length)];
+      setQuestion(fallbackQuestion);
+      
+      alert('⚠️ Could not load previous answers. Some questions might repeat.');
     }
-
-    const randomQuestion = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-    setQuestion(randomQuestion);
   };
 
   const acceptDare = async () => {
     setShowRules(false);
 
-    const res = await fetch('/api/get-answered-questions');
-    const data = await res.json();
-    const alreadyAnswered = data.answeredQuestions.map(q => q.question);
-
-    let availableQuestions = questions["Dare 🎭"].filter(q => !alreadyAnswered.includes(q));
-
-    if (availableQuestions.length < 2) {
-      setQuestion("You have completed all dares! 🎭🔥");
-      return;
-    }
-
-    const randomIndexes = [];
-    while (randomIndexes.length < 2) {
-      let rand = Math.floor(Math.random() * availableQuestions.length);
-      if (!randomIndexes.includes(rand)) {
-        randomIndexes.push(rand);
+    try {
+      console.log('🎭 Fetching answered dares...');
+      
+      const res = await fetch('/api/get-answered-questions');
+      
+      if (!res.ok) {
+        throw new Error(`Failed to fetch: ${res.status}`);
       }
-    }
+      
+      const data = await res.json();
+      console.log('🎭 Dare API Response:', data);
+      
+      // FIXED: Your API already returns question strings, not objects
+      const alreadyAnswered = data.answeredQuestions || [];
 
-    setDareOptions([availableQuestions[randomIndexes[0]], availableQuestions[randomIndexes[1]]]);
+      let availableQuestions = questions["Dare 🎭"].filter(q => !alreadyAnswered.includes(q));
+
+      console.log(`🎭 Total dares: ${questions["Dare 🎭"].length}`);
+      console.log(`🎭 Already answered: ${alreadyAnswered.length}`);
+      console.log(`🎭 Available dares: ${availableQuestions.length}`);
+
+      if (availableQuestions.length < 2) {
+        if (availableQuestions.length === 1) {
+          console.log('🎭 Only 1 dare left, showing it directly');
+          setQuestion(availableQuestions[0]);
+          return;
+        } else {
+          console.log('🎭 No dares left!');
+          setQuestion("🎭 You have completed all dares! Incredible! 🔥");
+          return;
+        }
+      }
+
+      const randomIndexes = [];
+      while (randomIndexes.length < 2) {
+        let rand = Math.floor(Math.random() * availableQuestions.length);
+        if (!randomIndexes.includes(rand)) {
+          randomIndexes.push(rand);
+        }
+      }
+
+      console.log('🎭 Selected 2 dares for choice');
+      setDareOptions([availableQuestions[randomIndexes[0]], availableQuestions[randomIndexes[1]]]);
+      
+    } catch (error) {
+      console.error('❌ Error in acceptDare:', error);
+      
+      // Fallback to random dares
+      const randomDares = questions["Dare 🎭"].sort(() => 0.5 - Math.random()).slice(0, 2);
+      setDareOptions(randomDares);
+      alert('⚠️ Could not load previous dares. Some might repeat.');
+    }
   };
 
   const handleDareSelection = (selectedDare) => {
@@ -271,61 +331,164 @@ export default function Home() {
   };
 
   const handleSubmit = async () => {
-    if (!answer) return;
-    const res = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: selectedCategory, question, answer })
-    });
+    if (!answer.trim()) {
+      alert('Please write an answer before submitting!');
+      return;
+    }
 
-    if (res.ok) {
-      setSelectedCategory('');
-      setQuestion('');
-      setAnswer('');
-      alert('Your response has been submitted! ✅');
-      router.push('/');
-    } else {
-      alert('Error submitting your response.');
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          category: selectedCategory, 
+          question, 
+          answer: answer.trim() 
+        })
+      });
+
+      if (res.ok) {
+        setSelectedCategory('');
+        setQuestion('');
+        setAnswer('');
+        alert('Your response has been submitted! ✅');
+        router.push('/');
+      } else {
+        const errorData = await res.json();
+        alert(`Error submitting response: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Submit error:', error);
+      alert('Error submitting your response. Please try again.');
     }
   };
 
   return (
     <Container 
-      maxWidth="sm" 
+      maxWidth="xs" 
       className="fade-in"
       sx={{ 
         textAlign: 'center', 
-        py: 4, 
+        px: 2,
+        py: 2, 
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center'
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        position: 'relative',
+        overflow: 'hidden',
+        paddingTop: '1rem',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%)',
+          zIndex: 1,
+          pointerEvents: 'none'
+        },
+        '& > *': {
+          position: 'relative',
+          zIndex: 2
+        }
       }}
     >
-      <Typography variant="h3" gutterBottom sx={{ fontWeight: 'bold', color: '#fff', textShadow: '2px 2px 10px rgba(0,0,0,0.2)' }}>
+      {/* Floating Hearts Animation */}
+      <Box sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: 1,
+        '&::before, &::after': {
+          content: '"💖"',
+          position: 'absolute',
+          fontSize: '2rem',
+          animation: 'float 6s ease-in-out infinite',
+          opacity: 0.3
+        },
+        '&::before': {
+          top: '10%',
+          left: '10%',
+          animationDelay: '0s'
+        },
+        '&::after': {
+          top: '70%',
+          right: '15%',
+          animationDelay: '3s'
+        }
+      }} />
+
+      <Typography 
+        variant="h4" 
+        gutterBottom 
+        sx={{ 
+          fontWeight: 'bold', 
+          background: 'linear-gradient(45deg, #ff6b6b, #feca57, #ff9ff3)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          color: 'transparent',
+          textShadow: '0 0 30px rgba(255, 107, 107, 0.5)',
+          mb: 3,
+          fontSize: '1.8rem',
+          animation: 'pulse 2s ease-in-out infinite alternate',
+          lineHeight: 1.2
+        }}
+      >
         Romantic Spicy Q&A 💖🔥
       </Typography>
 
       {!selectedCategory ? (
-        <>
-          <Typography variant="h5" gutterBottom sx={{ color: '#fff', mb: 2 }}>
-            Choose a category:
+        <Box sx={{ width: '100%', px: 1 }}>
+          <Typography 
+            variant="h6" 
+            gutterBottom 
+            sx={{ 
+              color: '#fff', 
+              mb: 3,
+              fontWeight: 300,
+              letterSpacing: 0.5,
+              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
+              fontSize: '1.1rem'
+            }}
+          >
+            Choose your adventure:
           </Typography>
           <Grid container spacing={2} justifyContent="center">
-            {Object.keys(questions).map((category) => (
-              <Grid item key={category}>
+            {Object.keys(questions).map((category, index) => (
+              <Grid item xs={12} key={category}>
                 <Button 
                   variant="contained" 
-                  color="secondary" 
                   startIcon={<FavoriteIcon />} 
-                  className="glow-button"
+                  fullWidth
                   sx={{
-                    background: 'linear-gradient(45deg, #ff758c, #ff7eb3)',
-                    borderRadius: '30px',
-                    px: 4,
-                    py: 1,
-                    fontWeight: 'bold'
+                    background: 'linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)',
+                    borderRadius: '20px',
+                    px: 2,
+                    py: 2.5,
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    textTransform: 'none',
+                    boxShadow: '0 8px 32px rgba(255, 117, 140, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    animation: `slideUp 0.6s ease-out ${index * 0.1}s both`,
+                    minHeight: '60px',
+                    '&:hover': {
+                      transform: 'translateY(-3px) scale(1.02)',
+                      boxShadow: '0 12px 40px rgba(255, 117, 140, 0.4)',
+                      background: 'linear-gradient(135deg, #ff6b9d 0%, #ff8cc8 100%)'
+                    },
+                    '&:active': {
+                      transform: 'translateY(-1px) scale(0.98)'
+                    }
                   }}
                   onClick={() => handleCategorySelect(category)}
                 >
@@ -334,83 +497,303 @@ export default function Home() {
               </Grid>
             ))}
           </Grid>
-        </>
+        </Box>
       ) : showRules ? (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+        <Box sx={{ 
+          mt: 2, 
+          p: 3, 
+          mx: 1,
+          borderRadius: '20px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+          animation: 'fadeInUp 0.6s ease-out',
+          maxHeight: '70vh',
+          overflowY: 'auto'
+        }}>
+          <Typography variant="h5" gutterBottom sx={{ 
+            color: '#fff',
+            mb: 3,
+            fontSize: '1.3rem',
+            fontWeight: 'bold'
+          }}>
             🎭 Dare Rules 🎭
           </Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>🔥 Choose a dare you feel comfortable doing.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>🔥 1) You must complete the Dare no matter what.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>💬 2) Answer "I will" or "Later" in the text box and complete the Dare in WhatsApp.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>⏳ 3) If you cannot do the Dare at the moment, you must complete it within 6 hours.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>🥵 4) Please Choose Only if are in a Mood to do some nughty Dares.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', mb: 1 }}>🫥 5) If you want to Go back close and open the Link.</Typography>
-          <Typography variant="body1" sx={{ color: '#fff', fontStyle: "italic", fontWeight: "bold", mb: 2 }}>❤️ 4) Love you Thango. ❤️</Typography>
+          
+          {[
+            "🔥 Choose a dare you feel comfortable doing.",
+            "🔥 1) You must complete the Dare no matter what.",
+            "💬 2) Answer \"I will\" or \"Later\" in the text box and complete the Dare in WhatsApp.",
+            "⏳ 3) If you cannot do the Dare at the moment, you must complete it within 6 hours.",
+            "🥵 4) Please Choose Only if are in a Mood to do some naughty Dares.",
+            "🫥 5) If you want to Go back close and open the Link."
+          ].map((rule, index) => (
+            <Typography 
+              key={index}
+              variant="body2" 
+              sx={{ 
+                color: '#fff', 
+                mb: 1.5,
+                fontSize: '0.9rem',
+                lineHeight: 1.4,
+                textAlign: 'left',
+                animation: `slideInLeft 0.5s ease-out ${index * 0.1}s both`
+              }}
+            >
+              {rule}
+            </Typography>
+          ))}
+          
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              color: '#fff', 
+              fontStyle: "italic", 
+              fontWeight: "bold", 
+              mb: 3,
+              fontSize: '1rem',
+              textAlign: 'center',
+              animation: 'heartbeat 2s ease-in-out infinite'
+            }}
+          >
+            ❤️ Love you Thango. ❤️
+          </Typography>
+          
           <Button 
             variant="contained" 
-            color="primary" 
-            className="glow-button"
+            fullWidth
+            sx={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              borderRadius: '15px',
+              py: 2,
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              textTransform: 'none',
+              boxShadow: '0 8px 32px rgba(79, 172, 254, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 12px 40px rgba(79, 172, 254, 0.4)'
+              }
+            }}
             onClick={acceptDare}
           >
             I Accept 🎭
           </Button>
         </Box>
       ) : dareOptions.length > 0 ? (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+        <Box sx={{ mt: 2, width: '100%', px: 1 }}>
+          <Typography variant="h6" gutterBottom sx={{ 
+            color: '#fff',
+            mb: 3,
+            fontSize: '1.2rem',
+            fontWeight: 'bold'
+          }}>
             Choose a Dare 🎭🔥
           </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            sx={{ mt: 2, display: 'block', width: '100%' }} 
-            onClick={() => handleDareSelection(dareOptions[0])}
-          >
-            {dareOptions[0]}
-          </Button>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            sx={{ mt: 2, display: 'block', width: '100%' }} 
-            onClick={() => handleDareSelection(dareOptions[1])}
-          >
-            {dareOptions[1]}
-          </Button>
+          {dareOptions.map((dare, index) => (
+            <Button 
+              key={index}
+              variant="contained" 
+              fullWidth
+              sx={{ 
+                mt: 2, 
+                py: 3,
+                background: 'linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%)',
+                borderRadius: '15px',
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                textTransform: 'none',
+                boxShadow: '0 8px 32px rgba(255, 117, 140, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                animation: `slideUp 0.6s ease-out ${index * 0.2}s both`,
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #ff6b9d 0%, #ff8cc8 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 12px 40px rgba(255, 117, 140, 0.4)'
+                }
+              }} 
+              onClick={() => handleDareSelection(dare)}
+            >
+              {dare}
+            </Button>
+          ))}
         </Box>
       ) : (
-        <Box sx={{ mt: 4 }}>
-          <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+        <Box sx={{ mt: 2, width: '100%', px: 1 }}>
+          <Typography variant="h6" gutterBottom sx={{ 
+            color: '#fff',
+            mb: 2,
+            fontSize: '1.2rem',
+            fontWeight: 'bold'
+          }}>
             {selectedCategory}
           </Typography>
-          <Typography variant="body1" gutterBottom sx={{ color: '#fff', fontStyle: 'italic', mb: 2 }}>
-            {question}
-          </Typography>
+          
+          <Box sx={{
+            p: 3,
+            mb: 3,
+            borderRadius: '20px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+            animation: 'fadeInUp 0.6s ease-out'
+          }}>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: '#fff', 
+                fontStyle: 'italic', 
+                fontSize: '1rem',
+                lineHeight: 1.5,
+                textAlign: 'center'
+              }}
+            >
+              {question}
+            </Typography>
+          </Box>
+          
           <TextField
             label="Answer here..."
             variant="outlined"
             fullWidth
             multiline
-            rows={2}
+            rows={3}
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             sx={{ 
-              backgroundColor: '#fff', // ✅ White background
-              borderRadius: '8px', 
+              mb: 3,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              borderRadius: '15px',
               '& .MuiOutlinedInput-root': {
-                '& fieldset': { borderColor: '#ccc' }, // Light grey border
-                '&:hover fieldset': { borderColor: '#ff758c' }, // Highlight border on hover
-                '&.Mui-focused fieldset': { borderColor: '#ff416c' } // Highlight border on focus
+                borderRadius: '15px',
+                '& fieldset': { 
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  borderWidth: '2px'
+                },
+                '&:hover fieldset': { borderColor: '#ff758c' },
+                '&.Mui-focused fieldset': { borderColor: '#ff416c' }
               },
-              '& textarea': { color: '#000' } // ✅ Ensures text is black
+              '& .MuiInputLabel-root': { color: '#666' },
+              '& textarea': { 
+                color: '#000',
+                fontSize: '1rem'
+              }
             }}
           />
 
-          <Button variant="contained" color="primary" className="glow-button" onClick={handleSubmit}>
-            Submit ❤️
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
+            <Button 
+              variant="outlined"
+              fullWidth
+              sx={{
+                borderColor: 'rgba(255, 255, 255, 0.5)',
+                color: '#fff',
+                borderRadius: '15px',
+                py: 2,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                textTransform: 'none',
+                backdropFilter: 'blur(10px)',
+                '&:hover': {
+                  borderColor: '#fff',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  transform: 'translateY(-1px)'
+                }
+              }}
+              onClick={() => window.location.reload()}
+            >
+              🔙 Back
+            </Button>
+            
+            <Button 
+              variant="contained" 
+              fullWidth
+              disabled={!answer.trim()}
+              sx={{
+                background: answer.trim() 
+                  ? 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' 
+                  : 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '15px',
+                py: 2,
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                textTransform: 'none',
+                boxShadow: answer.trim() 
+                  ? '0 8px 32px rgba(79, 172, 254, 0.3)' 
+                  : 'none',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                transition: 'all 0.3s ease',
+                '&:hover': answer.trim() ? {
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 12px 40px rgba(79, 172, 254, 0.4)'
+                } : {},
+                '&:disabled': {
+                  color: 'rgba(255, 255, 255, 0.5)'
+                }
+              }}
+              onClick={handleSubmit}
+            >
+              Submit ❤️
+            </Button>
+          </Box>
         </Box>
       )}
+
+      {/* Add custom styles for animations */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.05); }
+        }
+        
+        @keyframes slideUp {
+          0% { 
+            opacity: 0; 
+            transform: translateY(30px); 
+          }
+          100% { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
+        @keyframes fadeInUp {
+          0% { 
+            opacity: 0; 
+            transform: translateY(20px); 
+          }
+          100% { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
+        @keyframes slideInLeft {
+          0% { 
+            opacity: 0; 
+            transform: translateX(-20px); 
+          }
+          100% { 
+            opacity: 1; 
+            transform: translateX(0); 
+          }
+        }
+        
+        @keyframes heartbeat {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+        }
+        
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+      `}</style>
     </Container>
   );
 }
